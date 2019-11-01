@@ -3,4 +3,3 @@
 <?import javafx.scene.layout.Pane?>
 <Pane xmlns:fx="http://javafx.com/fxml" fx:controller="hu.atka.quiphutsfx.view.controller.MainController">
 </Pane>
-
