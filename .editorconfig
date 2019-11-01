@@ -1,0 +1,28 @@
+root = true
+
+[*.{java,html,js,json,properties,sql}]
+indent_style = tab
+tab_width = 4
+block_comment_start = /*
+block_comment = *
+block_comment_end = */
+end_of_line = crlf
+trim_trailing_whitespace = true
+insert_final_newline = true
+charset = utf-8
+
+[pom.xml]
+indent_style = tab
+tab_width = 4
+end_of_line = crlf
+trim_trailing_whitespace = true
+insert_final_newline = true
+charset = utf-8
+
+[*.md]
+indent_style = tab
+tab_width = 4
+end_of_line = crlf
+trim_trailing_whitespace = false
+insert_final_newline = true
+charset = utf-8
