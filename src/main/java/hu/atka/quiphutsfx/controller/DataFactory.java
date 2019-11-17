@@ -20,6 +20,6 @@ public class DataFactory {
 				new JSONObject().put("t", "A").put("v", "prompt").put("n", "PromptAudio"),
 				new JSONObject().put("t", "B").put("v", "Custom").put("n", "true")
 			}
-		).toString();
+		).toString().replace("\\\\", "\\");
 	}
 }

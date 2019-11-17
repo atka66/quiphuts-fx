@@ -12,36 +12,39 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import hu.atka.quiphutsfx.model.Prompt;
 
 public class ContentFactory {
 
-	private List<String> questions;
+	private List<Prompt> prompts;
+	private String path;
 
-	public ContentFactory(List<String> questions) {
-		this.questions = questions;
+	public ContentFactory(List<Prompt> prompts, String path) {
+		this.prompts = prompts;
+		this.path = path;
 	}
 
 	public void buildFileStructure() throws IOException {
-		Files.createDirectory(Paths.get("content"));
+		Files.createDirectory(Paths.get(path + "/content"));
 		this.buildManifest();
 		this.buildQuestions();
 	}
 
 	private void buildManifest() throws FileNotFoundException, UnsupportedEncodingException {
-		PrintWriter manifestWriter = new PrintWriter("content/manifest.jet", StandardCharsets.UTF_8.name());
+		PrintWriter manifestWriter = new PrintWriter(path + "/content/manifest.jet", StandardCharsets.UTF_8.name());
 		manifestWriter.print(ManifestFactory.build());
 		manifestWriter.close();
 	}
 
 	private void buildQuestions() throws IOException {
 		int currentQuestionId = 1000;
-		PrintWriter questionWriter = new PrintWriter("content/Question.jet", StandardCharsets.UTF_8.name());
+		PrintWriter questionWriter = new PrintWriter(path + "/content/Question.jet", StandardCharsets.UTF_8.name());
 		List<JSONObject> questionContentsJson = new ArrayList<>();
 
-		for (String question : this.questions) {
-			String escapedQuestion = StringEscapeUtils.escapeJson(question);
+		for (Prompt prompt : this.prompts) {
+			String escapedQuestion = StringEscapeUtils.escapeJson(prompt.getText());
 			currentQuestionId++;
-			String questionPath = "content/Question/" + currentQuestionId;
+			String questionPath = path + "/content/Question/" + currentQuestionId;
 			Files.createDirectories(Paths.get(questionPath));
 			questionContentsJson.add(QuestionFactory.build(escapedQuestion, currentQuestionId));
 
@@ -51,7 +54,9 @@ public class ContentFactory {
 
 			Files.copy(getClass().getResource("/audio/empty.mp3").openStream(), Paths.get(questionPath + "/" + "prompt.mp3"));
 		}
-		questionWriter.print(new JSONObject().put("content", questionContentsJson).put("episodeid", 1234).toString());
+		questionWriter.print(
+			new JSONObject().put("content", questionContentsJson).put("episodeid", 1234).toString().replace("\\\\", "\\")
+		);
 		questionWriter.close();
 	}
 }
