@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.ResourceBundle;
 import java.util.stream.Collectors;
 import hu.atka.quiphutsfx.controller.ContentFactory;
+import hu.atka.quiphutsfx.controller.exception.InvalidPromptTextException;
 import hu.atka.quiphutsfx.model.Prompt;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
@@ -19,14 +20,15 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.Alert;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 
 public class MainController implements Initializable {
 
 	@FXML
-	private HBox pane;
+	private VBox pane;
 
 	@FXML
 	private ListView<Prompt> promptListView;
@@ -34,96 +36,106 @@ public class MainController implements Initializable {
 	@FXML
 	private TextField promptField;
 
-	private Prompt selectedPrompt;
+	@FXML
+	private Text promptListInfoText;
 
 	public void initialize(URL location, ResourceBundle resources) {
 		promptListView.getSelectionModel().selectedItemProperty().addListener(
-			(observable, oldValue, newValue) -> {
-				selectedPrompt = observable.getValue();
-				promptField.setText(selectedPrompt.getText());
-			}
+			(observable, oldValue, newValue) -> promptField.setText(observable.getValue().getText())
 		);
 	}
 
 	@FXML
-	public void handleLoadPromptsButton(ActionEvent e) {
+	public void handleLoadPromptsMenu(ActionEvent e) {
 		FileChooser fileChooser = new FileChooser();
 		File file = fileChooser.showOpenDialog(pane.getScene().getWindow());
 		if (file != null) {
-			List<Prompt> loadedPrompts = null;
 			try {
-				loadedPrompts = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8)
+				List<Prompt> loadedPrompts = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8)
 					.stream().map(Prompt::new).collect(Collectors.toList());
+				promptListView.setItems(FXCollections.observableArrayList(loadedPrompts));
+				updatePromptListInfoText();
 			} catch (IOException ex) {
 				ex.printStackTrace();
-				Alert alert = new Alert(Alert.AlertType.ERROR);
-				alert.setTitle("Error");
-				alert.setHeaderText(null);
-				alert.setContentText("An error occurred during reading file!");
-				alert.showAndWait();
-			}
-			promptListView.setItems(FXCollections.observableArrayList(loadedPrompts));
-		}
-	}
-
-	@FXML
-	public void handleSavePromptsButton(ActionEvent e) {
-		FileChooser fileChooser = new FileChooser();
-		File file = fileChooser.showSaveDialog(pane.getScene().getWindow());
-		if (file != null) {
-			try {
-				savePromptsToFile(file, promptListView.getItems());
-				Alert alert = new Alert(Alert.AlertType.INFORMATION);
-				alert.setTitle("Success");
-				alert.setHeaderText(null);
-				alert.setContentText("Prompts saved successfully!");
-				alert.showAndWait();
-			} catch (FileNotFoundException ex) {
-				ex.printStackTrace();
-				Alert alert = new Alert(Alert.AlertType.ERROR);
-				alert.setTitle("Error");
-				alert.setHeaderText(null);
-				alert.setContentText("File not found!");
-				alert.showAndWait();
+				this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
 			}
 		}
 	}
 
 	@FXML
-	public void handleGenerateFolderButton(ActionEvent e) {
-		DirectoryChooser directoryChooser = new DirectoryChooser();
-		File directory = directoryChooser.showDialog(pane.getScene().getWindow());
-		ContentFactory contentFactory = new ContentFactory(promptListView.getItems(), directory.toPath().toString());
-		try {
-			contentFactory.buildFileStructure();
-			Alert alert = new Alert(Alert.AlertType.INFORMATION);
-			alert.setTitle("Success");
-			alert.setHeaderText(null);
-			alert.setContentText("File structure generated successfully!");
-			alert.showAndWait();
-		} catch (IOException ex) {
-			ex.printStackTrace();
-			Alert alert = new Alert(Alert.AlertType.ERROR);
-			alert.setTitle("Error");
-			alert.setHeaderText(null);
-			alert.setContentText("Could not generate file structure!");
-			alert.showAndWait();
+	public void handleSavePromptsMenu(ActionEvent e) {
+		if (!promptListView.getItems().isEmpty()) {
+			FileChooser fileChooser = new FileChooser();
+			File file = fileChooser.showSaveDialog(pane.getScene().getWindow());
+			if (file != null) {
+				try {
+					savePromptsToFile(file, promptListView.getItems());
+					this.showAlert(Alert.AlertType.INFORMATION, "Success", "Prompts saved successfully!");
+				} catch (FileNotFoundException ex) {
+					ex.printStackTrace();
+					this.showAlert(Alert.AlertType.ERROR, "Error", "Could not save prompts to file!");
+				}
+			}
+		} else {
+			this.showAlert(Alert.AlertType.WARNING, "Warning", "No prompts to save.");
+		}
+	}
+
+	@FXML
+	public void handleGenerateFolderMenu(ActionEvent e) {
+		if (!promptListView.getItems().isEmpty()) {
+			DirectoryChooser directoryChooser = new DirectoryChooser();
+			File directory = directoryChooser.showDialog(pane.getScene().getWindow());
+			if (directory != null) {
+				ContentFactory contentFactory = new ContentFactory(promptListView.getItems(), directory.toPath().toString());
+				try {
+					contentFactory.buildFileStructure();
+					this.showAlert(Alert.AlertType.INFORMATION, "Success", "File structure generated successfully!");
+				} catch (IOException ex) {
+					this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+				}
+			}
+		} else {
+			this.showAlert(Alert.AlertType.WARNING, "Warning", "No prompts to save.");
 		}
 	}
 
 	@FXML
 	public void handleUpdatePromptButton(ActionEvent e) {
-		promptListView.getItems()
-			.stream()
-			.filter(prompt -> prompt.getId().equals(selectedPrompt.getId()))
-			.findFirst()
-			.get().setText(promptField.getText());
-		promptListView.refresh();
+		String promptFieldText = promptField.getText();
+		if (isPromptSelected()) {
+			try {
+				this.checkPromptText(promptFieldText);
+				promptListView.getSelectionModel().getSelectedItem().setText(promptFieldText);
+				promptListView.refresh();
+			} catch (InvalidPromptTextException ex) {
+				this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+			}
+		} else {
+			this.showAlert(Alert.AlertType.WARNING, "Warning", "Nothing to update.");
+		}
 	}
 
 	@FXML
 	public void handleAddPromptButton(ActionEvent e) {
-		promptListView.getItems().add(new Prompt(promptField.getText()));
+		String promptFieldText = promptField.getText();
+		try {
+			this.checkPromptText(promptFieldText);
+			promptListView.getItems().add(new Prompt(promptFieldText));
+			updatePromptListInfoText();
+		} catch (InvalidPromptTextException ex) {
+			this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+		}
+	}
+
+	@FXML
+	public void handleRemovePromptButton(ActionEvent e) {
+		if (isPromptSelected()) {
+			promptListView.getItems().remove(promptListView.getSelectionModel().getSelectedItem());
+			updatePromptListInfoText();
+		} else {
+			this.showAlert(Alert.AlertType.WARNING, "Warning", "Nothing to remove.");
+		}
 	}
 
 	@FXML
@@ -137,5 +149,30 @@ public class MainController implements Initializable {
 			writer.println(prompt.getText());
 		}
 		writer.close();
+	}
+
+	private void checkPromptText(String promptText) throws InvalidPromptTextException {
+		if (promptText == null || promptText.trim().isEmpty()) {
+			throw new InvalidPromptTextException("Prompt text cannot be empty!");
+		}
+		if (promptText.matches(".*[őűŐŰ].*")) {
+			throw new InvalidPromptTextException("Prompt text cannot contain 'ő', 'ű' letters!");
+		}
+	}
+
+	private void showAlert(Alert.AlertType alertType, String title, String content) {
+		Alert alert = new Alert(alertType);
+		alert.setTitle(title);
+		alert.setHeaderText(null);
+		alert.setContentText(content);
+		alert.showAndWait();
+	}
+
+	private boolean isPromptSelected() {
+		return !(promptListView.getSelectionModel().getSelectedIndex() < 0);
+	}
+
+	private void updatePromptListInfoText() {
+		promptListInfoText.setText(String.format("%s prompts", promptListView.getItems().size()));
 	}
 }

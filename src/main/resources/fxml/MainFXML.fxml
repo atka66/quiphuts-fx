@@ -2,24 +2,32 @@
 
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
-<HBox xmlns:fx="http://javafx.com/fxml" fx:controller="hu.atka.quiphutsfx.view.controller.MainController" fx:id="pane">
-	<VBox>
-		<Button text="Load prompts" onAction="#handleLoadPromptsButton"/>
-		<Button text="Save prompts" onAction="#handleSavePromptsButton"/>
-		<Button text="Generate Folder" onAction="#handleGenerateFolderButton"/>
-	</VBox>
+<?import javafx.scene.text.Text?>
+<VBox xmlns:fx="http://javafx.com/fxml" fx:controller="hu.atka.quiphutsfx.view.controller.MainController" fx:id="pane">
+	<MenuBar>
+		<Menu text="Prompts">
+			<MenuItem text="Load from file" onAction="#handleLoadPromptsMenu"/>
+			<MenuItem text="Save to file" onAction="#handleSavePromptsMenu"/>
+		</Menu>
+		<Menu text="Generate">
+			<MenuItem text="Questions folder" onAction="#handleGenerateFolderMenu"/>
+		</Menu>
+	</MenuBar>
 	<ListView fx:id="promptListView"/>
-	<VBox>
-		<HBox>
-			<TextField fx:id="promptField"/>
-			<Button text="Add &#x3C;BLANK&#x3E;" onAction="#handleAddBlankToPromptButton"/>
-		</HBox>
-		<HBox>
-			<Button text="Update" onAction="#handleUpdatePromptButton"/>
-			<Button text="Add as new" onAction="#handleAddPromptButton"/>
-		</HBox>
-	</VBox>
-</HBox>
+	<HBox>
+		<TextField fx:id="promptField"/>
+		<Button text="Add &#x3C;BLANK&#x3E;" onAction="#handleAddBlankToPromptButton"/>
+		<Text text="No prompts" fx:id="promptListInfoText"/>
+	</HBox>
+	<HBox>
+		<Button text="Update" onAction="#handleUpdatePromptButton"/>
+		<Button text="Add as new" onAction="#handleAddPromptButton"/>
+		<Button text="Remove" onAction="#handleRemovePromptButton"/>
+	</HBox>
+</VBox>

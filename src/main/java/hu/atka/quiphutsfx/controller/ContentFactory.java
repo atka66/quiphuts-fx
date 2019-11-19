@@ -43,6 +43,7 @@ public class ContentFactory {
 
 		for (Prompt prompt : this.prompts) {
 			String escapedQuestion = StringEscapeUtils.escapeJson(prompt.getText());
+			escapedQuestion = escapedQuestion.replace("\\\"", "\"");
 			currentQuestionId++;
 			String questionPath = path + "/content/Question/" + currentQuestionId;
 			Files.createDirectories(Paths.get(questionPath));
