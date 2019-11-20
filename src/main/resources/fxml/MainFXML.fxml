@@ -9,6 +9,7 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Text?>
+<?import javafx.scene.control.ProgressBar?>
 <VBox xmlns:fx="http://javafx.com/fxml" fx:controller="hu.atka.quiphutsfx.view.controller.MainController" fx:id="pane">
 	<MenuBar>
 		<Menu text="Prompts">
@@ -19,15 +20,18 @@
 			<MenuItem text="Questions folder" onAction="#handleGenerateFolderMenu"/>
 		</Menu>
 	</MenuBar>
-	<ListView fx:id="promptListView"/>
-	<HBox>
-		<TextField fx:id="promptField"/>
-		<Button text="Add &#x3C;BLANK&#x3E;" onAction="#handleAddBlankToPromptButton"/>
-		<Text text="No prompts" fx:id="promptListInfoText"/>
-	</HBox>
-	<HBox>
-		<Button text="Update" onAction="#handleUpdatePromptButton"/>
-		<Button text="Add as new" onAction="#handleAddPromptButton"/>
-		<Button text="Remove" onAction="#handleRemovePromptButton"/>
-	</HBox>
+	<VBox>
+		<ListView fx:id="promptListView"/>
+		<HBox>
+			<TextField fx:id="promptField"/>
+			<Button text="Add &#x3C;BLANK&#x3E;" onAction="#handleAddBlankToPromptButton"/>
+		</HBox>
+		<HBox>
+			<Button text="Update" onAction="#handleUpdatePromptButton"/>
+			<Button text="Add as new" onAction="#handleAddPromptButton"/>
+			<Button text="Remove" onAction="#handleRemovePromptButton"/>
+		</HBox>
+		<Text fx:id="promptListInfoText"/>
+		<ProgressBar fx:id="progressBar" progress="0.0"/>
+	</VBox>
 </VBox>

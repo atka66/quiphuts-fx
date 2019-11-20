@@ -1,24 +1,21 @@
 package hu.atka.quiphutsfx.view.controller;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.List;
 import java.util.ResourceBundle;
-import java.util.stream.Collectors;
-import hu.atka.quiphutsfx.controller.ContentFactory;
 import hu.atka.quiphutsfx.controller.exception.InvalidPromptTextException;
 import hu.atka.quiphutsfx.model.Prompt;
+import hu.atka.quiphutsfx.view.service.GeneratorService;
+import hu.atka.quiphutsfx.view.service.PromptLoaderService;
+import hu.atka.quiphutsfx.view.service.PromptSaverService;
+import hu.atka.quiphutsfx.view.util.AlertFactory;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
-import javafx.scene.control.Alert;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
@@ -39,9 +36,18 @@ public class MainController implements Initializable {
 	@FXML
 	private Text promptListInfoText;
 
+	@FXML
+	private ProgressBar progressBar;
+
 	public void initialize(URL location, ResourceBundle resources) {
+		promptListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 		promptListView.getSelectionModel().selectedItemProperty().addListener(
-			(observable, oldValue, newValue) -> promptField.setText(observable.getValue().getText())
+			(observable, oldValue, newValue) -> {
+				Prompt selectedPrompt = observable.getValue();
+				if (selectedPrompt != null) {
+					promptField.setText(selectedPrompt.getText());
+				}
+			}
 		);
 	}
 
@@ -50,15 +56,19 @@ public class MainController implements Initializable {
 		FileChooser fileChooser = new FileChooser();
 		File file = fileChooser.showOpenDialog(pane.getScene().getWindow());
 		if (file != null) {
-			try {
-				List<Prompt> loadedPrompts = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8)
-					.stream().map(Prompt::new).collect(Collectors.toList());
-				promptListView.setItems(FXCollections.observableArrayList(loadedPrompts));
+			toggleProgressFreeze(true);
+			PromptLoaderService service = new PromptLoaderService();
+			service.setPath(file.toPath());
+			service.setOnSucceeded(event -> {
+				toggleProgressFreeze(false);
+				promptListView.setItems(FXCollections.observableArrayList(service.getValue()));
 				updatePromptListInfoText();
-			} catch (IOException ex) {
-				ex.printStackTrace();
-				this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
-			}
+			});
+			service.setOnFailed(event -> {
+				toggleProgressFreeze(false);
+				AlertFactory.showErrorWithStackTrace("Could not load prompts!", event.getSource().getException());
+			});
+			service.start();
 		}
 	}
 
@@ -68,16 +78,22 @@ public class MainController implements Initializable {
 			FileChooser fileChooser = new FileChooser();
 			File file = fileChooser.showSaveDialog(pane.getScene().getWindow());
 			if (file != null) {
-				try {
-					savePromptsToFile(file, promptListView.getItems());
-					this.showAlert(Alert.AlertType.INFORMATION, "Success", "Prompts saved successfully!");
-				} catch (FileNotFoundException ex) {
-					ex.printStackTrace();
-					this.showAlert(Alert.AlertType.ERROR, "Error", "Could not save prompts to file!");
-				}
+				toggleProgressFreeze(true);
+				PromptSaverService service = new PromptSaverService();
+				service.setFile(file);
+				service.setPrompts(promptListView.getItems());
+				service.setOnSucceeded(event -> {
+					toggleProgressFreeze(false);
+					AlertFactory.showInfo("Prompts saved successfully!");
+				});
+				service.setOnFailed(event -> {
+					toggleProgressFreeze(false);
+					AlertFactory.showErrorWithStackTrace("Could not save prompts to file!", event.getSource().getException());
+				});
+				service.start();
 			}
 		} else {
-			this.showAlert(Alert.AlertType.WARNING, "Warning", "No prompts to save.");
+			AlertFactory.showWarning("No prompts to save.");
 		}
 	}
 
@@ -87,16 +103,22 @@ public class MainController implements Initializable {
 			DirectoryChooser directoryChooser = new DirectoryChooser();
 			File directory = directoryChooser.showDialog(pane.getScene().getWindow());
 			if (directory != null) {
-				ContentFactory contentFactory = new ContentFactory(promptListView.getItems(), directory.toPath().toString());
-				try {
-					contentFactory.buildFileStructure();
-					this.showAlert(Alert.AlertType.INFORMATION, "Success", "File structure generated successfully!");
-				} catch (IOException ex) {
-					this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
-				}
+				toggleProgressFreeze(true);
+				GeneratorService service = new GeneratorService();
+				service.setPrompts(promptListView.getItems());
+				service.setPath(directory.toPath().toString());
+				service.setOnSucceeded(event -> {
+					toggleProgressFreeze(false);
+					AlertFactory.showInfo("File structure generated successfully!");
+				});
+				service.setOnFailed(event -> {
+					toggleProgressFreeze(false);
+					AlertFactory.showErrorWithStackTrace("Could not generate file structure!", event.getSource().getException());
+				});
+				service.start();
 			}
 		} else {
-			this.showAlert(Alert.AlertType.WARNING, "Warning", "No prompts to save.");
+			AlertFactory.showWarning("No prompts to save.");
 		}
 	}
 
@@ -109,10 +131,10 @@ public class MainController implements Initializable {
 				promptListView.getSelectionModel().getSelectedItem().setText(promptFieldText);
 				promptListView.refresh();
 			} catch (InvalidPromptTextException ex) {
-				this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+				AlertFactory.showErrorWithStackTrace("Invalid prompt text!", ex);
 			}
 		} else {
-			this.showAlert(Alert.AlertType.WARNING, "Warning", "Nothing to update.");
+			AlertFactory.showWarning("Nothing to update.");
 		}
 	}
 
@@ -124,31 +146,23 @@ public class MainController implements Initializable {
 			promptListView.getItems().add(new Prompt(promptFieldText));
 			updatePromptListInfoText();
 		} catch (InvalidPromptTextException ex) {
-			this.showAlert(Alert.AlertType.ERROR, "Error", ex.getMessage());
+			AlertFactory.showErrorWithStackTrace("Invalid prompt text!", ex);
 		}
 	}
 
 	@FXML
 	public void handleRemovePromptButton(ActionEvent e) {
 		if (isPromptSelected()) {
-			promptListView.getItems().remove(promptListView.getSelectionModel().getSelectedItem());
+			promptListView.getItems().removeAll(promptListView.getSelectionModel().getSelectedItems());
 			updatePromptListInfoText();
 		} else {
-			this.showAlert(Alert.AlertType.WARNING, "Warning", "Nothing to remove.");
+			AlertFactory.showWarning("Nothing to remove.");
 		}
 	}
 
 	@FXML
 	public void handleAddBlankToPromptButton(ActionEvent e) {
 		promptField.appendText("<BLANK>");
-	}
-
-	private void savePromptsToFile(File file, List<Prompt> prompts) throws FileNotFoundException {
-		PrintWriter writer = new PrintWriter(file);
-		for (Prompt prompt : prompts) {
-			writer.println(prompt.getText());
-		}
-		writer.close();
 	}
 
 	private void checkPromptText(String promptText) throws InvalidPromptTextException {
@@ -160,19 +174,18 @@ public class MainController implements Initializable {
 		}
 	}
 
-	private void showAlert(Alert.AlertType alertType, String title, String content) {
-		Alert alert = new Alert(alertType);
-		alert.setTitle(title);
-		alert.setHeaderText(null);
-		alert.setContentText(content);
-		alert.showAndWait();
-	}
-
 	private boolean isPromptSelected() {
 		return !(promptListView.getSelectionModel().getSelectedIndex() < 0);
 	}
 
 	private void updatePromptListInfoText() {
-		promptListInfoText.setText(String.format("%s prompts", promptListView.getItems().size()));
+		promptListInfoText.setText(String.format("%s prompt(s)", promptListView.getItems().size()));
+	}
+
+	private void toggleProgressFreeze(boolean freeze) {
+		promptListView.setDisable(freeze);
+		promptField.setDisable(freeze);
+
+		progressBar.setProgress(freeze ? -1.0 : 0.0);
 	}
 }
