@@ -11,7 +11,7 @@
 <?import javafx.scene.text.Text?>
 <?import javafx.scene.control.ProgressBar?>
 <VBox xmlns:fx="http://javafx.com/fxml" fx:controller="hu.atka.quiphutsfx.view.controller.MainController" fx:id="pane">
-	<MenuBar>
+	<MenuBar fx:id="menuBar">
 		<Menu text="Prompts">
 			<MenuItem text="Load from file" onAction="#handleLoadPromptsMenu"/>
 			<MenuItem text="Save to file" onAction="#handleSavePromptsMenu"/>
@@ -24,12 +24,12 @@
 		<ListView fx:id="promptListView"/>
 		<HBox>
 			<TextField fx:id="promptField"/>
-			<Button text="Add &#x3C;BLANK&#x3E;" onAction="#handleAddBlankToPromptButton"/>
+			<Button fx:id="addBlankToPromptButton" text="Add &#x3C;BLANK&#x3E;" onAction="#handleAddBlankToPromptButton"/>
 		</HBox>
 		<HBox>
-			<Button text="Update" onAction="#handleUpdatePromptButton"/>
-			<Button text="Add as new" onAction="#handleAddPromptButton"/>
-			<Button text="Remove" onAction="#handleRemovePromptButton"/>
+			<Button fx:id="updatePromptButton" text="Update" onAction="#handleUpdatePromptButton"/>
+			<Button fx:id="addPromptButton" text="Add as new" onAction="#handleAddPromptButton"/>
+			<Button fx:id="removePromptButton" text="Remove" onAction="#handleRemovePromptButton"/>
 		</HBox>
 		<Text fx:id="promptListInfoText"/>
 		<ProgressBar fx:id="progressBar" progress="0.0"/>

@@ -2,8 +2,8 @@ package hu.atka.quiphutsfx.view.controller;
 
 import java.io.File;
 import java.net.URL;
+import java.util.List;
 import java.util.ResourceBundle;
-import hu.atka.quiphutsfx.controller.exception.InvalidPromptTextException;
 import hu.atka.quiphutsfx.model.Prompt;
 import hu.atka.quiphutsfx.view.service.GeneratorService;
 import hu.atka.quiphutsfx.view.service.PromptLoaderService;
@@ -13,7 +13,10 @@ import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.MenuBar;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.SelectionMode;
 import javafx.scene.control.TextField;
@@ -39,6 +42,21 @@ public class MainController implements Initializable {
 	@FXML
 	private ProgressBar progressBar;
 
+	@FXML
+	private MenuBar menuBar;
+
+	@FXML
+	private Button addBlankToPromptButton;
+
+	@FXML
+	private Button updatePromptButton;
+
+	@FXML
+	private Button addPromptButton;
+
+	@FXML
+	private Button removePromptButton;
+
 	public void initialize(URL location, ResourceBundle resources) {
 		promptListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
 		promptListView.getSelectionModel().selectedItemProperty().addListener(
@@ -49,6 +67,25 @@ public class MainController implements Initializable {
 				}
 			}
 		);
+		promptListView.setCellFactory(param -> new ListCell<Prompt>() {
+			@Override
+			protected void updateItem(Prompt item, boolean empty) {
+				super.updateItem(item, empty);
+
+				if (empty || item == null || item.getText() == null) {
+					setText(null);
+					setStyle("-fx-border-style: none");
+				} else {
+					setText(item.getText());
+					if (item.isValid()){
+						setStyle("-fx-border-style: none");
+					} else {
+						setStyle("-fx-border-style: solid; -fx-border-width: 0 0 0 3; -fx-border-color: salmon;");
+					}
+				}
+				updatePromptListInfoText();
+			}
+		});
 	}
 
 	@FXML
@@ -61,8 +98,9 @@ public class MainController implements Initializable {
 			service.setPath(file.toPath());
 			service.setOnSucceeded(event -> {
 				toggleProgressFreeze(false);
-				promptListView.setItems(FXCollections.observableArrayList(service.getValue()));
-				updatePromptListInfoText();
+				List<Prompt> prompts = service.getValue();
+				prompts.forEach(prompt -> prompt.setValid(checkPromptText(prompt.getText(), false)));
+				promptListView.setItems(FXCollections.observableArrayList(prompts));
 			});
 			service.setOnFailed(event -> {
 				toggleProgressFreeze(false);
@@ -126,13 +164,10 @@ public class MainController implements Initializable {
 	public void handleUpdatePromptButton(ActionEvent e) {
 		String promptFieldText = promptField.getText();
 		if (isPromptSelected()) {
-			try {
-				this.checkPromptText(promptFieldText);
-				promptListView.getSelectionModel().getSelectedItem().setText(promptFieldText);
-				promptListView.refresh();
-			} catch (InvalidPromptTextException ex) {
-				AlertFactory.showErrorWithStackTrace("Invalid prompt text!", ex);
-			}
+			Prompt selectedPrompt = promptListView.getSelectionModel().getSelectedItem();
+			selectedPrompt.setText(promptFieldText);
+			selectedPrompt.setValid(checkPromptText(promptFieldText, true));
+			promptListView.refresh();
 		} else {
 			AlertFactory.showWarning("Nothing to update.");
 		}
@@ -141,20 +176,13 @@ public class MainController implements Initializable {
 	@FXML
 	public void handleAddPromptButton(ActionEvent e) {
 		String promptFieldText = promptField.getText();
-		try {
-			this.checkPromptText(promptFieldText);
-			promptListView.getItems().add(new Prompt(promptFieldText));
-			updatePromptListInfoText();
-		} catch (InvalidPromptTextException ex) {
-			AlertFactory.showErrorWithStackTrace("Invalid prompt text!", ex);
-		}
+		promptListView.getItems().add(new Prompt(promptFieldText, checkPromptText(promptFieldText, true)));
 	}
 
 	@FXML
 	public void handleRemovePromptButton(ActionEvent e) {
 		if (isPromptSelected()) {
 			promptListView.getItems().removeAll(promptListView.getSelectionModel().getSelectedItems());
-			updatePromptListInfoText();
 		} else {
 			AlertFactory.showWarning("Nothing to remove.");
 		}
@@ -165,13 +193,20 @@ public class MainController implements Initializable {
 		promptField.appendText("<BLANK>");
 	}
 
-	private void checkPromptText(String promptText) throws InvalidPromptTextException {
+	private boolean checkPromptText(String promptText, boolean alert) {
 		if (promptText == null || promptText.trim().isEmpty()) {
-			throw new InvalidPromptTextException("Prompt text cannot be empty!");
+			if (alert) {
+				AlertFactory.showWarning("Empty prompt text added!");
+			}
+			return false;
 		}
 		if (promptText.matches(".*[őűŐŰ].*")) {
-			throw new InvalidPromptTextException("Prompt text cannot contain 'ő', 'ű' letters!");
+			if (alert) {
+				AlertFactory.showWarning(String.format("Prompt text contains unsafe characters ('ő', 'ű'): %s", promptText));
+			}
+			return false;
 		}
+		return true;
 	}
 
 	private boolean isPromptSelected() {
@@ -179,12 +214,23 @@ public class MainController implements Initializable {
 	}
 
 	private void updatePromptListInfoText() {
-		promptListInfoText.setText(String.format("%s prompt(s)", promptListView.getItems().size()));
+		promptListInfoText.setText(
+			String.format(
+				"%d prompt(s), %d invalid",
+				promptListView.getItems().size(),
+				promptListView.getItems().stream().filter(prompt -> !prompt.isValid()).count()
+			)
+		);
 	}
 
 	private void toggleProgressFreeze(boolean freeze) {
 		promptListView.setDisable(freeze);
 		promptField.setDisable(freeze);
+		addBlankToPromptButton.setDisable(freeze);
+		updatePromptButton.setDisable(freeze);
+		addPromptButton.setDisable(freeze);
+		removePromptButton.setDisable(freeze);
+		menuBar.setDisable(freeze);
 
 		progressBar.setProgress(freeze ? -1.0 : 0.0);
 	}
